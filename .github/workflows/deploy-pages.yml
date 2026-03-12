@@ -39,8 +39,7 @@ jobs:
           window.APP_CONFIG = {
             supabaseUrl: "${{ vars.SUPABASE_URL }}",
             supabaseAnonKey: "${{ secrets.SUPABASE_ANON_KEY }}",
-            adminEmail: "${{ vars.ADMIN_EMAIL }}",
-            pageSize: Number("${{ vars.PAGE_SIZE || '100' }}")
+            adminEmail: "${{ vars.ADMIN_EMAIL }}"
           };
           EOF
 

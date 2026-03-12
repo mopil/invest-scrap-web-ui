@@ -1,5 +1,5 @@
 export const PENDING_SUBJECTS = ["일반", "매매일지", "광견병", "헛소리", "계집"];
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 20;
 export const SELECTED_ROW_STORAGE_KEY = "invest-scrap-selected-row";
 export const BAD_REASON_OPTIONS = [
   "투자 정보 처럼 보이지만 실상 상관없는 글/제목",
