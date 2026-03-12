@@ -7,6 +7,7 @@ import {
 } from "../constants/review";
 import {
   createViewKey,
+  embedBadDocuments,
   fetchDocumentCounts,
   fetchDocuments,
   PAGE_SIZE,
@@ -57,6 +58,7 @@ export function useReviewDocuments({ supabase, session, config, enabled = true }
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [embedding, setEmbedding] = useState(false);
   const [status, setStatus] = useState({ message: "", isError: false });
   const [tab, setTab] = useState("pending");
   const [reviewedFilter, setReviewedFilter] = useState("bad");
@@ -428,9 +430,58 @@ export function useReviewDocuments({ supabase, session, config, enabled = true }
     await loadDocuments({ force: true });
   }
 
+  async function embedVisibleBadRows() {
+    if (!supabase || embedding) {
+      return;
+    }
+
+    setEmbedding(true);
+    setStatus({ message: "", isError: false });
+
+    try {
+      const response = await embedBadDocuments({ supabase });
+      const results = Array.isArray(response?.results) ? response.results : [];
+      const skipped = Number(response?.skipped_count || 0);
+      const failed = results.filter((item) => !item.ok);
+      const failureCount = Number.isFinite(Number(response?.failure_count))
+        ? Number(response.failure_count)
+        : failed.length;
+      const successCount = Number.isFinite(Number(response?.success_count))
+        ? Number(response.success_count)
+        : results.length - failed.length;
+
+      if (!results.length && skipped === 0) {
+        setStatus({ message: "임베딩할 BAD 문서가 없습니다.", isError: false });
+        return;
+      }
+
+      if (failureCount > 0) {
+        const failedMessage = failed
+          .slice(0, 3)
+          .map((item) => `${item.scrapped_document_id}: ${item.error}`)
+          .join(", ");
+        setStatus({
+          message: `임베딩 ${successCount}건 성공, ${failureCount}건 실패${skipped ? `, ${skipped}건 제외` : ""}${failedMessage ? ` (${failedMessage})` : ""}`,
+          isError: true
+        });
+        return;
+      }
+
+      setStatus({
+        message: `BAD 문서 ${successCount}건을 임베딩했습니다.${skipped ? ` ${skipped}건은 사유 없음으로 제외했습니다.` : ""}`,
+        isError: false
+      });
+    } catch (error) {
+      setStatus({ message: error.message, isError: true });
+    } finally {
+      setEmbedding(false);
+    }
+  }
+
   return {
     loading,
     saving,
+    embedding,
     status,
     setStatus,
     tab,
@@ -463,6 +514,7 @@ export function useReviewDocuments({ supabase, session, config, enabled = true }
     setBadReasonMode,
     handleMarkAllGood,
     saveAllRows,
+    embedVisibleBadRows,
     refreshDocuments: () => loadDocuments({ force: true })
   };
 }

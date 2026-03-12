@@ -25,10 +25,12 @@ function MobileQuickBar({
   setTab,
   dirtyCount,
   saving,
+  embedding,
   loading,
   expanded,
   onToggleExpanded,
   onMarkAllGood,
+  onEmbedBadRows,
   onRefresh,
   onSaveAll
 }) {
@@ -55,7 +57,7 @@ function MobileQuickBar({
                 event.stopPropagation();
                 onSaveAll();
               }}
-              disabled={saving || dirtyCount === 0}
+              disabled={saving || embedding || dirtyCount === 0}
             >
               {dirtyCount ? `저장 ${dirtyCount}` : "저장"}
             </button>
@@ -110,8 +112,16 @@ function MobileQuickBar({
               <button
                 className={buttonClassName("secondary")}
                 type="button"
+                onClick={onEmbedBadRows}
+                disabled={loading || saving || embedding}
+              >
+                {embedding ? "임베딩 중" : "임베딩"}
+              </button>
+              <button
+                className={buttonClassName("secondary")}
+                type="button"
                 onClick={onMarkAllGood}
-                disabled={loading || saving}
+                disabled={loading || saving || embedding}
               >
                 모두 GOOD
               </button>
@@ -119,7 +129,7 @@ function MobileQuickBar({
                 className={buttonClassName("secondary")}
                 type="button"
                 onClick={onRefresh}
-                disabled={loading || saving}
+                disabled={loading || saving || embedding}
               >
                 새로고침
               </button>
@@ -145,6 +155,7 @@ export default function App({ config, hasValidConfig, supabase }) {
   const {
     loading,
     saving,
+    embedding,
     status,
     setStatus,
     tab,
@@ -177,6 +188,7 @@ export default function App({ config, hasValidConfig, supabase }) {
     setBadReasonMode,
     handleMarkAllGood,
     saveAllRows,
+    embedVisibleBadRows,
     refreshDocuments
   } = useReviewDocuments({ supabase, session, config, enabled: reviewEnabled });
 
@@ -240,7 +252,7 @@ export default function App({ config, hasValidConfig, supabase }) {
       return;
     }
 
-    setAuthStatus({ message: "로그아웃되었습니다.", isError: false });
+    setAuthStatus({ message: "로그아웃했습니다.", isError: false });
   }
 
   const activeTabLabel = useMemo(() => TAB_LABELS[tab] || "검수", [tab]);
@@ -261,7 +273,7 @@ export default function App({ config, hasValidConfig, supabase }) {
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6">
-      <SavingOverlay visible={saving} dirtyCount={dirtyCount} />
+      <SavingOverlay visible={saving || embedding} dirtyCount={dirtyCount} />
       <Sidebar
         activeMenu={activeMenu}
         onSelect={setActiveMenu}
@@ -340,12 +352,14 @@ export default function App({ config, hasValidConfig, supabase }) {
                   dirtyCount={dirtyCount}
                   loading={loading}
                   saving={saving}
+                  embedding={embedding}
                   rowsLength={displayRows.length}
                   activeTabLabel={activeTabLabel}
                   totalCount={totalCount}
                   page={page}
                   totalPages={totalPages}
                   onMarkAllGood={handleMarkAllGood}
+                  onEmbedBadRows={embedVisibleBadRows}
                   onSaveAll={saveAllRows}
                   onRefresh={refreshDocuments}
                 />
@@ -409,10 +423,12 @@ export default function App({ config, hasValidConfig, supabase }) {
           setTab={setTab}
           dirtyCount={dirtyCount}
           saving={saving}
+          embedding={embedding}
           loading={loading}
           expanded={mobileQuickBarExpanded}
           onToggleExpanded={() => setMobileQuickBarExpanded((current) => !current)}
           onMarkAllGood={handleMarkAllGood}
+          onEmbedBadRows={embedVisibleBadRows}
           onRefresh={refreshDocuments}
           onSaveAll={saveAllRows}
         />

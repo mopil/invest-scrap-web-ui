@@ -13,12 +13,14 @@ export default function ReviewHeader({
   dirtyCount,
   loading,
   saving,
+  embedding,
   rowsLength,
   activeTabLabel,
   totalCount,
   page,
   totalPages,
   onMarkAllGood,
+  onEmbedBadRows,
   onSaveAll,
   onRefresh
 }) {
@@ -32,8 +34,7 @@ export default function ReviewHeader({
               현재 보기: <span className="font-semibold text-slate-800">{activeTabLabel}</span>
               <span className="mx-2 text-slate-300">|</span>
               페이지 <span className="font-semibold text-slate-800">{page}</span> / {totalPages}
-              <span className="mx-2 text-slate-300">|</span>
-              총 <span className="font-semibold text-slate-800">{totalCount}</span>건
+              <span className="mx-2 text-slate-300">|</span>총 <span className="font-semibold text-slate-800">{totalCount}</span>건
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -44,7 +45,7 @@ export default function ReviewHeader({
                   : "bg-emerald-50 text-emerald-700 ring-emerald-200"
               }`}
             >
-              {dirtyCount ? `미저장 변경 ${dirtyCount}건` : "모든 변경 사항 저장됨"}
+              {dirtyCount ? `미저장 변경 ${dirtyCount}건` : "모든 변경사항 저장됨"}
             </span>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
               현재 페이지 {rowsLength}건 표시 중
@@ -62,8 +63,16 @@ export default function ReviewHeader({
           <button
             className={buttonClassName("secondary")}
             type="button"
+            onClick={onEmbedBadRows}
+            disabled={loading || saving || embedding}
+          >
+            {embedding ? "임베딩 중..." : "임베딩하기"}
+          </button>
+          <button
+            className={buttonClassName("secondary")}
+            type="button"
             onClick={onMarkAllGood}
-            disabled={loading || saving || rowsLength === 0}
+            disabled={loading || saving || embedding || rowsLength === 0}
           >
             현재 페이지 모두 GOOD
           </button>
@@ -71,15 +80,15 @@ export default function ReviewHeader({
             className={buttonClassName("primary")}
             type="button"
             onClick={onSaveAll}
-            disabled={saving || dirtyCount === 0}
+            disabled={saving || embedding || dirtyCount === 0}
           >
-            {dirtyCount ? `변경 사항 저장 (${dirtyCount})` : "변경 사항 저장"}
+            {dirtyCount ? `변경사항 저장 (${dirtyCount})` : "변경사항 저장"}
           </button>
           <button
             className={buttonClassName("secondary")}
             type="button"
             onClick={onRefresh}
-            disabled={loading || saving}
+            disabled={loading || saving || embedding}
           >
             새로고침
           </button>
