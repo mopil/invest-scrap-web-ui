@@ -1,0 +1,60 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate runtime config
+        run: |
+          mkdir -p public
+          cat > public/app-config.js <<EOF
+          window.APP_CONFIG = {
+            supabaseUrl: "${{ vars.SUPABASE_URL }}",
+            supabaseAnonKey: "${{ secrets.SUPABASE_ANON_KEY }}",
+            adminEmail: "${{ vars.ADMIN_EMAIL }}",
+            pageSize: Number("${{ vars.PAGE_SIZE || '100' }}")
+          };
+          EOF
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

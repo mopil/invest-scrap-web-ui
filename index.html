@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scrapped Document Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="./app-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Noto Sans KR", "sans-serif"]
+            },
+            colors: {
+              pine: {
+                50: "#f2f7f5",
+                100: "#e4efe9",
+                200: "#cadfd4",
+                300: "#a4c5b4",
+                400: "#78a287",
+                500: "#58836a",
+                600: "#436955",
+                700: "#365445",
+                800: "#2d4439",
+                900: "#263931"
+              }
+            },
+            boxShadow: {
+              panel: "0 18px 40px rgba(27, 48, 39, 0.08)"
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+  <body class="bg-[radial-gradient(circle_at_top_left,rgba(24,78,59,0.12),transparent_24%),linear-gradient(180deg,#f5f7f6_0%,#eef3f1_100%)] text-slate-900 font-sans">
+    <div id="root"></div>
+    <script type="module" src="./src/main.jsx"></script>
+  </body>
+  </html>
