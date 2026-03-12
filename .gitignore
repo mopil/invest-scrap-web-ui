@@ -3,3 +3,4 @@ dist
 public/app-config.js
 *.log
 *.err.log
+supabase/.temp/
