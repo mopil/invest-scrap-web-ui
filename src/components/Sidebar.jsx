@@ -2,7 +2,12 @@ const MENU_ITEMS = [
   {
     id: "scrapped-document-review",
     label: "스크랩 게시글 검수",
-    description: "LLM 스코어링 결과를 검수하고 학습용 데이터를 정제하는 작업 화면입니다."
+    description: "스크랩된 게시글을 검수하고 GOOD/BAD 판정과 사유를 저장합니다."
+  },
+  {
+    id: "bad-reason-dashboard",
+    label: "BAD 사유 대시보드",
+    description: "BAD 사유 건수, 입력률, 사용자 직접입력 패턴을 분석합니다."
   }
 ];
 
@@ -27,7 +32,7 @@ export default function Sidebar({ activeMenu, onSelect, isOpen, onClose }) {
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-pine-700">Invest Scrap</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">Web UI</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              스크랩 기능을 메뉴 단위로 확장하기 위한 내부 운영자용 관리 UI입니다.
+              스크랩 검수와 BAD 사유 통계를 관리하는 내부 운영 UI입니다.
             </p>
           </div>
           <button

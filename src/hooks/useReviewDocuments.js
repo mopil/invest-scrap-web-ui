@@ -49,7 +49,7 @@ function isTypingTarget(target) {
   return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
 }
 
-export function useReviewDocuments({ supabase, session, config }) {
+export function useReviewDocuments({ supabase, session, config, enabled = true }) {
   const today = useMemo(() => getRelativeDateString(0), []);
   const defaultStartDate = useMemo(() => getRelativeDateString(-(DEFAULT_DATE_RANGE_DAYS - 1)), []);
   const didAutoScrollRef = useRef(false);
@@ -85,6 +85,10 @@ export function useReviewDocuments({ supabase, session, config }) {
   }, [tab, reviewedFilter, dateFrom, dateTo, searchType, searchKeyword]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (!session || !supabase) {
       setRows([]);
       setDrafts({});
@@ -99,7 +103,7 @@ export function useReviewDocuments({ supabase, session, config }) {
     }
 
     void loadDocuments({ force: false });
-  }, [session, supabase, isAllowedUser, tab, reviewedFilter, dateFrom, dateTo, page, searchType, searchKeyword]);
+  }, [enabled, session, supabase, isAllowedUser, tab, reviewedFilter, dateFrom, dateTo, page, searchType, searchKeyword]);
 
   const displayRows = useMemo(() => {
     return rows

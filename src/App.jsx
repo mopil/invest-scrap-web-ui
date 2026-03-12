@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import BadReasonDashboard from "./components/BadReasonDashboard";
 import FiltersBar from "./components/FiltersBar";
 import LoginPanel from "./components/LoginPanel";
 import Pagination from "./components/Pagination";
@@ -7,6 +8,7 @@ import ReviewTable from "./components/ReviewTable";
 import SavingOverlay from "./components/SavingOverlay";
 import Sidebar from "./components/Sidebar";
 import StatusBanner from "./components/StatusBanner";
+import { useBadReasonDashboard } from "./hooks/useBadReasonDashboard";
 import { useReviewDocuments } from "./hooks/useReviewDocuments";
 import { rowKey } from "./utils/format";
 import { buttonClassName, panelClassName } from "./utils/ui";
@@ -137,6 +139,9 @@ export default function App({ config, hasValidConfig, supabase }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [authStatus, setAuthStatus] = useState({ message: "", isError: false });
 
+  const reviewEnabled = activeMenu === "scrapped-document-review";
+  const dashboardEnabled = activeMenu === "bad-reason-dashboard";
+
   const {
     loading,
     saving,
@@ -173,7 +178,9 @@ export default function App({ config, hasValidConfig, supabase }) {
     handleMarkAllGood,
     saveAllRows,
     refreshDocuments
-  } = useReviewDocuments({ supabase, session, config });
+  } = useReviewDocuments({ supabase, session, config, enabled: reviewEnabled });
+
+  const dashboard = useBadReasonDashboard({ supabase, session, config, enabled: dashboardEnabled });
 
   useEffect(() => {
     if (!hasValidConfig || !supabase) {
@@ -233,10 +240,13 @@ export default function App({ config, hasValidConfig, supabase }) {
       return;
     }
 
-    setStatus({ message: "로그아웃되었습니다.", isError: false });
+    setAuthStatus({ message: "로그아웃되었습니다.", isError: false });
   }
 
   const activeTabLabel = useMemo(() => TAB_LABELS[tab] || "검수", [tab]);
+  const activeStatus = session ? (reviewEnabled ? status : dashboard.status) : authStatus;
+  const showMobileQuickBar = session && isAllowedUser && reviewEnabled;
+  const mobileBottomPadding = showMobileQuickBar ? (mobileQuickBarExpanded ? "pb-56" : "pb-28") : "pb-6";
 
   if (!hasValidConfig) {
     return (
@@ -248,10 +258,6 @@ export default function App({ config, hasValidConfig, supabase }) {
       </div>
     );
   }
-
-  const visibleStatus = session ? status : authStatus;
-  const showMobileQuickBar = session && isAllowedUser && activeMenu === "scrapped-document-review";
-  const mobileBottomPadding = showMobileQuickBar ? (mobileQuickBarExpanded ? "pb-56" : "pb-28") : "pb-6";
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6">
@@ -290,7 +296,7 @@ export default function App({ config, hasValidConfig, supabase }) {
           ) : null}
         </header>
 
-        {session ? <StatusBanner status={visibleStatus} /> : null}
+        {session ? <StatusBanner status={activeStatus} /> : null}
 
         {!session ? (
           <LoginPanel onSubmit={handleLogin} disabled={authLoading} status={authStatus} />
@@ -301,19 +307,19 @@ export default function App({ config, hasValidConfig, supabase }) {
           </section>
         ) : (
           <section className={panelClassName(`p-4 ${mobileBottomPadding} sm:p-6 sm:pb-6`)}>
-            {activeMenu === "scrapped-document-review" ? (
+            {reviewEnabled ? (
               <>
                 <div className="mb-6 rounded-[24px] border border-pine-100 bg-pine-50/70 px-4 py-4 sm:px-5 sm:py-5">
                   <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">스크랩 게시글 수동 검수</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    LLM이 분류한 게시글을 사람이 다시 확인해 학습용 레이블 데이터를 정제하는 작업입니다.
+                    스크랩된 게시글을 사람이 다시 확인해 GOOD/BAD를 판정하고, BAD 사유 데이터를 정리하는 화면입니다.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    subject가 일반, 매매일지, 관망글, 뉴스정리, 계좌인 문서를 우선 검수 대상으로 보여줍니다.
+                    미검수 문서는 모델 점수 순으로 우선 노출되며, 설정된 subject 범위를 기준으로 검수합니다.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="rounded-full bg-white px-3 py-1 font-medium text-pine-900 ring-1 ring-inset ring-pine-100">
-                      문서를 열어 확인한 뒤 GOOD/BAD와 사유를 입력해 주세요.
+                      문서를 확인한 뒤 GOOD/BAD와 사유를 입력해 저장해 주세요.
                     </span>
                     <span
                       className={`rounded-full px-3 py-1 font-medium ring-1 ring-inset ${
@@ -381,7 +387,18 @@ export default function App({ config, hasValidConfig, supabase }) {
                   onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
                 />
               </>
-            ) : null}
+            ) : (
+              <BadReasonDashboard
+                loading={dashboard.loading}
+                status={{ message: "", isError: false }}
+                dateFrom={dashboard.dateFrom}
+                setDateFrom={dashboard.setDateFrom}
+                dateTo={dashboard.dateTo}
+                setDateTo={dashboard.setDateTo}
+                stats={dashboard.stats}
+                onRefresh={dashboard.refresh}
+              />
+            )}
           </section>
         )}
       </div>
