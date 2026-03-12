@@ -1,6 +1,7 @@
+import { useEffect, useMemo, useState } from "react";
+import { buildDocumentUrl, formatDateTime } from "../utils/format";
+import { buttonClassName, getScoreTone, panelClassName } from "../utils/ui";
 import StatusBanner from "./StatusBanner";
-import { buttonClassName, panelClassName } from "../utils/ui";
-import { formatDateTime } from "../utils/format";
 
 function StatCard({ label, value, hint }) {
   return (
@@ -12,19 +13,27 @@ function StatCard({ label, value, hint }) {
   );
 }
 
-function ProgressBar({ label, count, ratio, tone = "bg-pine-600" }) {
+function ProgressBar({ label, count, ratio, active, onClick }) {
   return (
-    <div className="grid gap-2">
+    <button
+      type="button"
+      className={`grid w-full gap-2 rounded-2xl border px-4 py-3 text-left transition ${
+        active
+          ? "border-pine-300 bg-pine-50 shadow-sm"
+          : "border-slate-200 bg-white hover:border-pine-200 hover:bg-slate-50"
+      }`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="truncate font-medium text-slate-700">{label}</span>
         <span className="shrink-0 text-slate-500">
-          {count} / {ratio.toFixed(1)}%
+          {count}건 / {ratio.toFixed(1)}%
         </span>
       </div>
       <div className="h-3 rounded-full bg-slate-100">
-        <div className={`h-3 rounded-full ${tone}`} style={{ width: `${Math.min(ratio, 100)}%` }} />
+        <div className="h-3 rounded-full bg-pine-600" style={{ width: `${Math.min(ratio, 100)}%` }} />
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -51,6 +60,129 @@ function TrendBars({ items, maxCount }) {
   );
 }
 
+function RowMappingTable({ rows, selectedGroupLabel }) {
+  if (!rows.length) {
+    return <p className="text-sm text-slate-500">선택한 사유에 매핑된 row가 없습니다.</p>;
+  }
+
+  return (
+    <div className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70">
+      <table className="min-w-full border-collapse">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-[0.08em] text-slate-500">
+            <th className="bg-white px-4 py-3 font-semibold">사유 버킷</th>
+            <th className="bg-white px-4 py-3 font-semibold">문서</th>
+            <th className="bg-white px-4 py-3 font-semibold">원문 사유</th>
+            <th className="bg-white px-4 py-3 font-semibold">점수</th>
+            <th className="bg-white px-4 py-3 font-semibold">작성자</th>
+            <th className="bg-white px-4 py-3 font-semibold">최근 시각</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const scoreTone = getScoreTone(row.inferScore);
+            return (
+              <tr key={row.id} className="border-b border-slate-200 last:border-b-0">
+                <td className="px-4 py-4 align-top">
+                  <span className="inline-flex rounded-full bg-pine-50 px-3 py-1 text-xs font-semibold text-pine-900">
+                    {selectedGroupLabel}
+                  </span>
+                </td>
+                <td className="px-4 py-4 align-top">
+                  <a
+                    className="font-semibold text-pine-900 hover:underline"
+                    href={buildDocumentUrl(row.boardId, row.documentId)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {row.title}
+                  </a>
+                  {row.subject ? <div className="mt-1 text-sm text-slate-500">{row.subject}</div> : null}
+                </td>
+                <td className="px-4 py-4 align-top text-sm text-slate-700">{row.rawReason || "-"}</td>
+                <td className="px-4 py-4 align-top">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${scoreTone}`}>
+                    {row.inferScore ?? "-"}
+                  </span>
+                </td>
+                <td className="px-4 py-4 align-top text-sm text-slate-700">{row.author || "-"}</td>
+                <td className="px-4 py-4 align-top text-sm text-slate-500">
+                  {formatDateTime(row.updatedAt || row.createdAt)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function escapeCsvValue(value) {
+  const normalized = String(value ?? "");
+  if (normalized.includes(",") || normalized.includes('"') || normalized.includes("\n")) {
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }
+
+  return normalized;
+}
+
+function downloadCsv(filename, rows) {
+  if (!rows.length) {
+    return;
+  }
+
+  const headers = [
+    "mapped_reason",
+    "raw_reason",
+    "document_id",
+    "board_id",
+    "title",
+    "subject",
+    "author",
+    "infer_score",
+    "created_at",
+    "updated_at",
+    "document_url"
+  ];
+
+  const csvLines = [
+    headers.join(","),
+    ...rows.map((row) =>
+      [
+        row.mappedReason,
+        row.rawReason,
+        row.documentId,
+        row.boardId,
+        row.title,
+        row.subject,
+        row.author,
+        row.inferScore ?? "",
+        row.createdAt ?? "",
+        row.updatedAt ?? "",
+        buildDocumentUrl(row.boardId, row.documentId)
+      ]
+        .map(escapeCsvValue)
+        .join(",")
+    )
+  ];
+
+  const blob = new Blob(["\uFEFF", csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function buildCsvFilename(prefix, dateFrom, dateTo, suffix = "") {
+  const safeSuffix = suffix ? `-${suffix.replace(/[^\w\-]+/g, "_")}` : "";
+  return `${prefix}-${dateFrom}-${dateTo}${safeSuffix}.csv`;
+}
+
 export default function BadReasonDashboard({
   loading,
   status,
@@ -61,18 +193,57 @@ export default function BadReasonDashboard({
   stats,
   onRefresh
 }) {
-  const topReasonMax = Math.max(...(stats?.topReasons || []).map((item) => item.ratio), 0);
+  const [selectedReasonKey, setSelectedReasonKey] = useState("");
+
   const dailyMax = Math.max(...(stats?.dailyStats || []).map((item) => item.count), 0);
-  const customReasonPreview = stats?.customReasons?.slice(0, 10) || [];
+  const reasonOptions = stats?.mappedReasonGroups || [];
+
+  useEffect(() => {
+    if (!reasonOptions.length) {
+      setSelectedReasonKey("");
+      return;
+    }
+
+    const matched = reasonOptions.find((group) => group.key === selectedReasonKey);
+    if (!matched) {
+      setSelectedReasonKey(reasonOptions[0].key);
+    }
+  }, [reasonOptions, selectedReasonKey]);
+
+  const selectedReasonGroup = useMemo(
+    () => reasonOptions.find((group) => group.key === selectedReasonKey) || null,
+    [reasonOptions, selectedReasonKey]
+  );
+
+  const flattenedRows = useMemo(() => reasonOptions.flatMap((group) => group.rows), [reasonOptions]);
+
+  function handleExportSelected() {
+    if (!selectedReasonGroup?.rows?.length) {
+      return;
+    }
+
+    downloadCsv(
+      buildCsvFilename("bad-reason-mapping", dateFrom, dateTo, selectedReasonGroup.label),
+      selectedReasonGroup.rows
+    );
+  }
+
+  function handleExportAll() {
+    if (!flattenedRows.length) {
+      return;
+    }
+
+    downloadCsv(buildCsvFilename("bad-reason-mapping-all", dateFrom, dateTo), flattenedRows);
+  }
 
   return (
     <div className="grid gap-5">
       <div className="flex flex-col gap-4 rounded-[24px] border border-amber-100 bg-amber-50/70 px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">BAD Reason Dashboard</p>
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">BAD 사유 통계</h2>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">BAD 사유-문서 매핑 대시보드</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            기간별 BAD 건수, 사유 입력률, 카테고리 집중도, 직접입력 사유 패턴을 한 화면에서 확인합니다.
+            프롬프트 고도화를 위해 어떤 row가 어떤 BAD 사유 버킷으로 매핑됐는지 직접 확인하고 CSV로 내보낼 수 있습니다.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
@@ -102,136 +273,88 @@ export default function BadReasonDashboard({
 
       <StatusBanner status={status} />
 
-      <div className="grid gap-4 xl:grid-cols-4">
+      <div className="flex justify-end">
+        <button
+          className={buttonClassName("secondary")}
+          type="button"
+          onClick={handleExportAll}
+          disabled={!flattenedRows.length}
+        >
+          전체 매핑 CSV
+        </button>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
         <StatCard
           label="전체 BAD"
           value={stats ? stats.totalBadCount.toLocaleString() : "-"}
           hint="선택한 기간 내 BAD 판정 전체 건수입니다."
         />
         <StatCard
-          label="사유 입력률"
-          value={stats ? `${stats.completionRate.toFixed(1)}%` : "-"}
-          hint={stats ? `사유 입력 ${stats.withReasonCount}건 / 미입력 ${stats.withoutReasonCount}건` : "BAD 사유 입력 비율"}
-        />
-        <StatCard
-          label="사유 미입력"
-          value={stats ? stats.withoutReasonCount.toLocaleString() : "-"}
-          hint="사유 없이 저장된 BAD 건수입니다."
+          label="사유 매핑 완료"
+          value={stats ? stats.mappedRowsCount.toLocaleString() : "-"}
+          hint="사유가 입력되어 버킷에 매핑 가능한 row 수입니다."
         />
         <StatCard
           label="직접입력 사유"
           value={stats ? stats.customReasonCount.toLocaleString() : "-"}
-          hint="표준 사유 외 직접입력으로 저장된 건수입니다."
+          hint={stats ? `사유 미입력 ${stats.noReasonCount}건은 보조 지표로만 유지합니다.` : "표준 사유 외 직접입력 건수"}
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
         <section className={panelClassName("p-5")}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">상위 사유</h3>
-              <p className="text-sm text-slate-500">선택한 기간에서 가장 많이 나온 BAD 사유입니다.</p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
-              {stats?.topReasons?.length || 0}개 표시
-            </span>
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-slate-900">사유별 분포</h3>
+            <p className="text-sm text-slate-500">사유를 클릭하면 아래에서 해당 row 매핑 목록을 바로 확인할 수 있습니다.</p>
           </div>
-          <div className="grid gap-4">
-            {(stats?.topReasons || []).length ? (
-              stats.topReasons.map((item) => (
+          <div className="grid gap-3">
+            {reasonOptions.length ? (
+              reasonOptions.map((item) => (
                 <ProgressBar
                   key={item.key}
                   label={item.label}
                   count={item.count}
                   ratio={item.ratio}
-                  tone={item.ratio === topReasonMax ? "bg-rose-500" : "bg-pine-600"}
+                  active={item.key === selectedReasonKey}
+                  onClick={() => setSelectedReasonKey(item.key)}
                 />
               ))
             ) : (
-              <p className="text-sm text-slate-500">표시할 사유 분포가 없습니다.</p>
+              <p className="text-sm text-slate-500">사유가 입력된 BAD row가 없습니다.</p>
             )}
           </div>
         </section>
 
         <section className={panelClassName("p-5")}>
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-900">사유 입력 현황</h3>
-            <p className="text-sm text-slate-500">BAD 판정이 얼마나 일관되게 사유와 함께 저장되고 있는지 보여줍니다.</p>
-          </div>
-          <div className="grid gap-4">
-            <ProgressBar
-              label="사유 입력"
-              count={stats?.withReasonCount || 0}
-              ratio={stats?.completionRate || 0}
-              tone="bg-emerald-500"
-            />
-            <ProgressBar
-              label="사유 미입력"
-              count={stats?.withoutReasonCount || 0}
-              ratio={stats ? 100 - stats.completionRate : 0}
-              tone="bg-amber-500"
-            />
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className={panelClassName("p-5")}>
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-900">일별 추이</h3>
-            <p className="text-sm text-slate-500">선택한 기간 동안 날짜별 BAD 건수 추이입니다.</p>
+            <h3 className="text-lg font-bold text-slate-900">일별 BAD 추이</h3>
+            <p className="text-sm text-slate-500">기간별 BAD 볼륨 변화를 함께 확인합니다.</p>
           </div>
           <TrendBars items={stats?.dailyStats || []} maxCount={dailyMax} />
-        </section>
-
-        <section className={panelClassName("p-5")}>
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-900">전체 사유 분포</h3>
-            <p className="text-sm text-slate-500">사유 미입력과 직접입력을 포함한 전체 정규화 버킷 분포입니다.</p>
-          </div>
-          <div className="grid gap-3">
-            {(stats?.reasonBreakdown || []).map((item) => (
-              <ProgressBar key={item.key} label={item.label} count={item.count} ratio={item.ratio} />
-            ))}
-          </div>
         </section>
       </div>
 
       <section className={panelClassName("p-5")}>
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">직접입력 사유 목록</h3>
-            <p className="text-sm text-slate-500">직접입력 사유를 묶어서 최신 활동 순으로 정렬합니다.</p>
+            <h3 className="text-lg font-bold text-slate-900">사유별 row 매핑</h3>
+            <p className="text-sm text-slate-500">
+              {selectedReasonGroup
+                ? `현재 선택: ${selectedReasonGroup.label} (${selectedReasonGroup.count}건)`
+                : "왼쪽에서 사유를 선택해 주세요."}
+            </p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
-            {stats?.customReasons?.length || 0}개 그룹
-          </span>
+          <button
+            className={buttonClassName("secondary")}
+            type="button"
+            onClick={handleExportSelected}
+            disabled={!selectedReasonGroup?.rows?.length}
+          >
+            선택 사유 CSV
+          </button>
         </div>
-
-        {customReasonPreview.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-y-2">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-[0.08em] text-slate-500">
-                  <th className="px-3 py-2">사유</th>
-                  <th className="px-3 py-2">건수</th>
-                  <th className="px-3 py-2">최근 시각</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customReasonPreview.map((item) => (
-                  <tr key={item.reason} className="rounded-2xl bg-slate-50 text-sm text-slate-700">
-                    <td className="rounded-l-2xl px-3 py-3">{item.reason}</td>
-                    <td className="px-3 py-3 font-semibold">{item.count}</td>
-                    <td className="rounded-r-2xl px-3 py-3 text-slate-500">{formatDateTime(item.latestAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">현재 기간에는 직접입력 사유가 없습니다.</p>
-        )}
+        <RowMappingTable rows={selectedReasonGroup?.rows || []} selectedGroupLabel={selectedReasonGroup?.label || "-"} />
       </section>
     </div>
   );

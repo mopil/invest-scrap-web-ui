@@ -31,17 +31,16 @@ function getReasonBucket(reason) {
   return CUSTOM_BUCKET;
 }
 
-function buildReasonMap() {
-  const map = new Map();
+function getReasonLabel(bucket) {
+  if (bucket === NO_REASON_BUCKET) {
+    return "사유 미입력";
+  }
 
-  BAD_REASON_OPTIONS.forEach((label) => {
-    map.set(label, { key: label, label, count: 0, ratio: 0 });
-  });
+  if (bucket === CUSTOM_BUCKET) {
+    return "직접입력 사유";
+  }
 
-  map.set(NO_REASON_BUCKET, { key: NO_REASON_BUCKET, label: "사유 미입력", count: 0, ratio: 0 });
-  map.set(CUSTOM_BUCKET, { key: CUSTOM_BUCKET, label: "직접입력 사유", count: 0, ratio: 0 });
-
-  return map;
+  return bucket;
 }
 
 function formatRatio(count, total) {
@@ -52,6 +51,12 @@ function formatRatio(count, total) {
   return Number(((count / total) * 100).toFixed(1));
 }
 
+function sortRowsByLatest(a, b) {
+  const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+  const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+  return timeB - timeA;
+}
+
 export async function fetchBadReasonRows({ supabase, dateFrom, dateTo }) {
   const rows = [];
   let from = 0;
@@ -60,7 +65,7 @@ export async function fetchBadReasonRows({ supabase, dateFrom, dateTo }) {
     const to = from + BATCH_SIZE - 1;
     const { data, error } = await supabase
       .from("scrapped_document")
-      .select("id, eval_reason, created_at, updated_at")
+      .select("id, title, subject, author, board_id, document_id, infer_score, eval_reason, created_at, updated_at")
       .eq("good_bad_type", "BAD")
       .gte("created_at", buildDayStartIso(dateFrom))
       .lte("created_at", buildDayEndIso(dateTo))
@@ -85,79 +90,73 @@ export async function fetchBadReasonRows({ supabase, dateFrom, dateTo }) {
 }
 
 export function buildBadReasonDashboard(rows) {
-  const reasonMap = buildReasonMap();
   const dailyMap = new Map();
-  const customMap = new Map();
+  const reasonGroupMap = new Map();
 
   rows.forEach((row) => {
+    const normalizedReason = normalizeReason(row.eval_reason);
     const bucket = getReasonBucket(row.eval_reason);
-    const nextReason = reasonMap.get(bucket);
-    nextReason.count += 1;
+    const group = reasonGroupMap.get(bucket) || {
+      key: bucket,
+      label: getReasonLabel(bucket),
+      count: 0,
+      ratio: 0,
+      rows: []
+    };
+
+    group.count += 1;
+    group.rows.push({
+      id: row.id,
+      title: row.title || row.subject || "제목 없음",
+      subject: row.subject || "",
+      author: row.author || "",
+      boardId: row.board_id || "",
+      documentId: row.document_id || "",
+      inferScore: row.infer_score,
+      rawReason: normalizedReason || "",
+      mappedReason: group.label,
+      createdAt: row.created_at || null,
+      updatedAt: row.updated_at || null
+    });
+    reasonGroupMap.set(bucket, group);
 
     const day = String(row.created_at || "").slice(0, 10);
-    dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
-
-    if (bucket === CUSTOM_BUCKET) {
-      const normalizedReason = normalizeReason(row.eval_reason);
-      const current = customMap.get(normalizedReason) || {
-        reason: normalizedReason,
-        count: 0,
-        latestAt: row.updated_at || row.created_at || null
-      };
-      current.count += 1;
-
-      const nextLatestAt = row.updated_at || row.created_at || null;
-      if (!current.latestAt || (nextLatestAt && new Date(nextLatestAt) > new Date(current.latestAt))) {
-        current.latestAt = nextLatestAt;
-      }
-
-      customMap.set(normalizedReason, current);
+    if (day) {
+      dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
     }
   });
 
   const totalBadCount = rows.length;
-  const noReasonCount = reasonMap.get(NO_REASON_BUCKET).count;
-  const customReasonCount = reasonMap.get(CUSTOM_BUCKET).count;
-  const withReasonCount = totalBadCount - noReasonCount;
-
-  const reasonBreakdown = Array.from(reasonMap.values())
-    .map((item) => ({
-      ...item,
-      ratio: formatRatio(item.count, totalBadCount)
+  const reasonGroups = Array.from(reasonGroupMap.values())
+    .map((group) => ({
+      ...group,
+      ratio: formatRatio(group.count, totalBadCount),
+      rows: group.rows.sort(sortRowsByLatest)
     }))
     .sort((a, b) => {
       if (b.count !== a.count) {
         return b.count - a.count;
       }
 
-      return a.label.localeCompare(b.label);
+      return a.label.localeCompare(b.label, "ko");
     });
 
-  const topReasons = reasonBreakdown.filter((item) => item.count > 0).slice(0, 6);
+  const noReasonGroup = reasonGroups.find((group) => group.key === NO_REASON_BUCKET) || null;
+  const mappedReasonGroups = reasonGroups.filter((group) => group.key !== NO_REASON_BUCKET);
+  const mappedRowsCount = mappedReasonGroups.reduce((sum, group) => sum + group.count, 0);
+  const customReasonGroup = reasonGroups.find((group) => group.key === CUSTOM_BUCKET) || null;
 
   const dailyStats = Array.from(dailyMap.entries())
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const customReasons = Array.from(customMap.values()).sort((a, b) => {
-    const timeA = new Date(a.latestAt || 0).getTime();
-    const timeB = new Date(b.latestAt || 0).getTime();
-    if (timeB !== timeA) {
-      return timeB - timeA;
-    }
-
-    return b.count - a.count;
-  });
-
   return {
     totalBadCount,
-    withReasonCount,
-    withoutReasonCount: noReasonCount,
-    completionRate: formatRatio(withReasonCount, totalBadCount),
-    customReasonCount,
-    reasonBreakdown,
-    topReasons,
-    dailyStats,
-    customReasons
+    mappedRowsCount,
+    noReasonCount: noReasonGroup?.count || 0,
+    customReasonCount: customReasonGroup?.count || 0,
+    reasonGroups,
+    mappedReasonGroups,
+    dailyStats
   };
 }

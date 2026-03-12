@@ -390,7 +390,7 @@ export default function App({ config, hasValidConfig, supabase }) {
             ) : (
               <BadReasonDashboard
                 loading={dashboard.loading}
-                status={{ message: "", isError: false }}
+                status={dashboard.status}
                 dateFrom={dashboard.dateFrom}
                 setDateFrom={dashboard.setDateFrom}
                 dateTo={dashboard.dateTo}

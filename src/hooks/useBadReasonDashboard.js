@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_DATE_RANGE_DAYS } from "../constants/review";
-import { getRelativeDateString } from "../utils/format";
 import { buildBadReasonDashboard, fetchBadReasonRows } from "../services/badReasonDashboard";
+import { getRelativeDateString } from "../utils/format";
 
 export function useBadReasonDashboard({ supabase, session, config, enabled = true }) {
   const today = useMemo(() => getRelativeDateString(0), []);
@@ -23,6 +23,7 @@ export function useBadReasonDashboard({ supabase, session, config, enabled = tru
 
     if (!session || !supabase) {
       setStats(null);
+      setStatus({ message: "", isError: false });
       return;
     }
 
