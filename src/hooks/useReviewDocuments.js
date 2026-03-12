@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BAD_REASON_CUSTOM, BAD_REASON_OPTIONS, SELECTED_ROW_STORAGE_KEY } from "../constants/review";
+import {
+  BAD_REASON_CUSTOM,
+  BAD_REASON_OPTIONS,
+  DEFAULT_DATE_RANGE_DAYS,
+  SELECTED_ROW_STORAGE_KEY
+} from "../constants/review";
 import {
   createViewKey,
   fetchDocumentCounts,
@@ -7,22 +12,46 @@ import {
   PAGE_SIZE,
   saveDocumentReviews
 } from "../services/documents";
-import { getTodayString, rowKey } from "../utils/format";
+import { getRelativeDateString, rowKey } from "../utils/format";
+
+function normalizeReason(value) {
+  return String(value ?? "").trim();
+}
+
+function findMatchingBadReason(reason) {
+  const normalizedReason = normalizeReason(reason);
+  if (!normalizedReason) {
+    return "";
+  }
+
+  return BAD_REASON_OPTIONS.find((option) => normalizeReason(option) === normalizedReason) || "";
+}
 
 function inferBadReasonMode(reason) {
   if (!reason) {
     return "";
   }
 
-  if (BAD_REASON_OPTIONS.includes(reason)) {
-    return reason;
+  const matchedReason = findMatchingBadReason(reason);
+  if (matchedReason) {
+    return matchedReason;
   }
 
   return BAD_REASON_CUSTOM;
 }
 
+function isTypingTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+
 export function useReviewDocuments({ supabase, session, config }) {
-  const today = useMemo(() => getTodayString(), []);
+  const today = useMemo(() => getRelativeDateString(0), []);
+  const defaultStartDate = useMemo(() => getRelativeDateString(-(DEFAULT_DATE_RANGE_DAYS - 1)), []);
   const didAutoScrollRef = useRef(false);
   const cacheRef = useRef({});
   const [rows, setRows] = useState([]);
@@ -33,7 +62,7 @@ export function useReviewDocuments({ supabase, session, config }) {
   const [reviewedFilter, setReviewedFilter] = useState("bad");
   const [searchType, setSearchType] = useState("title");
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [dateFrom, setDateFrom] = useState(today);
+  const [dateFrom, setDateFrom] = useState(defaultStartDate);
   const [dateTo, setDateTo] = useState(today);
   const [drafts, setDrafts] = useState({});
   const [badReasonModes, setBadReasonModes] = useState({});
@@ -72,22 +101,81 @@ export function useReviewDocuments({ supabase, session, config }) {
     void loadDocuments({ force: false });
   }, [session, supabase, isAllowedUser, tab, reviewedFilter, dateFrom, dateTo, page, searchType, searchKeyword]);
 
+  const displayRows = useMemo(() => {
+    return rows
+      .map((row) => {
+        const draft = drafts[rowKey(row.id)];
+        if (!draft) {
+          return row;
+        }
+
+        return {
+          ...row,
+          good_bad_type: draft.good_bad_type ?? row.good_bad_type ?? null,
+          eval_reason: draft.eval_reason ?? row.eval_reason ?? null
+        };
+      })
+      .sort((a, b) => {
+        if (tab === "reviewed" || tab === "reviewed_good" || tab === "reviewed_bad") {
+          const updatedAtA = new Date(a.updated_at || 0).getTime();
+          const updatedAtB = new Date(b.updated_at || 0).getTime();
+          if (updatedAtA !== updatedAtB) {
+            return updatedAtB - updatedAtA;
+          }
+        } else {
+          const scoreA = a.infer_score ?? Number.NEGATIVE_INFINITY;
+          const scoreB = b.infer_score ?? Number.NEGATIVE_INFINITY;
+          if (scoreA !== scoreB) {
+            return scoreB - scoreA;
+          }
+        }
+
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
+  }, [rows, drafts, tab]);
+
   useEffect(() => {
     function handleKeydown(event) {
       const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
-      if (!isSaveShortcut) {
+      if (isSaveShortcut) {
+        event.preventDefault();
+        if (session) {
+          void saveAllRows();
+        }
         return;
       }
 
-      event.preventDefault();
-      if (session) {
-        void saveAllRows();
+      if (!session || saving || loading || !selectedRowId || isTypingTarget(event.target)) {
+        return;
+      }
+
+      const selectedRow = displayRows.find((row) => String(row.id) === String(selectedRowId));
+      if (!selectedRow) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "g") {
+        event.preventDefault();
+        handleTypeChange(selectedRow, "GOOD");
+        return;
+      }
+
+      if (key === "b") {
+        event.preventDefault();
+        handleTypeChange(selectedRow, "BAD");
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        selectNextRow();
       }
     }
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [session, drafts, saving]);
+  }, [session, displayRows, selectedRowId, saving, loading, drafts]);
 
   useEffect(() => {
     if (!selectedRowId) {
@@ -219,10 +307,22 @@ export function useReviewDocuments({ supabase, session, config }) {
     setSelectedRowId(String(id));
   }
 
+  function selectNextRow() {
+    if (!displayRows.length) {
+      return;
+    }
+
+    const currentIndex = displayRows.findIndex((row) => String(row.id) === String(selectedRowId));
+    const nextRow = displayRows[currentIndex + 1] || displayRows[currentIndex] || displayRows[0];
+    if (nextRow) {
+      handleSelectRow(nextRow.id);
+    }
+  }
+
   function handleTypeChange(row, nextValue) {
     handleSelectRow(row.id);
     const existingReason = draftValueForRow(row)?.eval_reason ?? row.eval_reason ?? null;
-    const nextReason = nextValue === "GOOD" && BAD_REASON_OPTIONS.includes(existingReason) ? "" : undefined;
+    const nextReason = nextValue === "GOOD" && findMatchingBadReason(existingReason) ? "" : undefined;
 
     if (nextValue === "BAD") {
       setBadReasonMode(row, inferBadReasonMode(existingReason));
@@ -236,32 +336,16 @@ export function useReviewDocuments({ supabase, session, config }) {
     upsertDraft(row, { eval_reason: nextValue });
   }
 
-  const displayRows = useMemo(() => {
-    return rows
-      .map((row) => {
-        const draft = drafts[rowKey(row.id)];
-        if (!draft) {
-          return row;
-        }
-
-        return {
-          ...row,
-          good_bad_type: draft.good_bad_type ?? row.good_bad_type ?? null,
-          eval_reason: draft.eval_reason ?? row.eval_reason ?? null
-        };
-      })
-      .sort((a, b) => {
-        const scoreA = a.infer_score ?? Number.NEGATIVE_INFINITY;
-        const scoreB = b.infer_score ?? Number.NEGATIVE_INFINITY;
-        if (scoreA !== scoreB) {
-          return scoreB - scoreA;
-        }
-
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      });
-  }, [rows, drafts]);
-
   function handleMarkAllGood() {
+    if (!displayRows.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(`현재 페이지 ${displayRows.length}건을 모두 GOOD으로 표시할까요?`);
+    if (!confirmed) {
+      return;
+    }
+
     setDrafts((current) => {
       const next = { ...current };
 
@@ -270,7 +354,7 @@ export function useReviewDocuments({ supabase, session, config }) {
         const existingReason = current[key]?.eval_reason ?? row.eval_reason ?? null;
         const merged = {
           good_bad_type: "GOOD",
-          eval_reason: BAD_REASON_OPTIONS.includes(existingReason) ? null : existingReason
+          eval_reason: findMatchingBadReason(existingReason) ? null : existingReason
         };
         const unchanged =
           (merged.good_bad_type ?? null) === (row.good_bad_type ?? null) &&
@@ -286,15 +370,14 @@ export function useReviewDocuments({ supabase, session, config }) {
       return next;
     });
 
-    if (displayRows.length) {
-      handleSelectRow(displayRows[0].id);
-    }
+    handleSelectRow(displayRows[0].id);
+    setStatus({ message: `현재 페이지 ${displayRows.length}건을 GOOD 초안으로 반영했습니다.`, isError: false });
   }
 
   async function saveAllRows() {
     if (!supabase || saving || !Object.keys(drafts).length) {
       if (!Object.keys(drafts).length) {
-        setStatus({ message: "저장할 변경사항이 없습니다.", isError: false });
+        setStatus({ message: "저장할 변경 사항이 없습니다.", isError: false });
       }
       return;
     }
@@ -302,7 +385,7 @@ export function useReviewDocuments({ supabase, session, config }) {
     setSaving(true);
     setStatus({ message: "", isError: false });
 
-    const { failed, savedEntries } = await saveDocumentReviews({ supabase, drafts });
+    const { failed, savedEntries, updatedAt } = await saveDocumentReviews({ supabase, drafts });
     if (failed.length) {
       setSaving(false);
       setStatus({ message: `저장 실패: ${failed.join(", ")}`, isError: true });
@@ -321,7 +404,8 @@ export function useReviewDocuments({ supabase, session, config }) {
         return {
           ...row,
           good_bad_type: payload.good_bad_type ?? null,
-          eval_reason: payload.eval_reason && payload.eval_reason.trim() ? payload.eval_reason.trim() : null
+          eval_reason: payload.eval_reason && payload.eval_reason.trim() ? payload.eval_reason.trim() : null,
+          updated_at: updatedAt
         };
       });
 
@@ -335,7 +419,7 @@ export function useReviewDocuments({ supabase, session, config }) {
     setDrafts({});
     setBadReasonModes({});
     setSaving(false);
-    setStatus({ message: `${savedEntries.length}건 저장되었습니다.`, isError: false });
+    setStatus({ message: `${savedEntries.length}건이 저장되었습니다.`, isError: false });
     cacheRef.current = {};
     await loadDocuments({ force: true });
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FiltersBar from "./components/FiltersBar";
 import LoginPanel from "./components/LoginPanel";
 import Pagination from "./components/Pagination";
@@ -11,90 +11,119 @@ import { useReviewDocuments } from "./hooks/useReviewDocuments";
 import { rowKey } from "./utils/format";
 import { buttonClassName, panelClassName } from "./utils/ui";
 
+const TAB_LABELS = {
+  pending: "미검수",
+  reviewed_good: "GOOD 완료",
+  reviewed_bad: "BAD 완료",
+  reviewed: "전체 검수 완료"
+};
+
 function MobileQuickBar({
   tab,
   setTab,
   dirtyCount,
   saving,
   loading,
+  expanded,
+  onToggleExpanded,
   onMarkAllGood,
   onRefresh,
   onSaveAll
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
-      <div className="mx-auto grid max-w-[1600px] gap-3">
-        <div className="grid grid-cols-4 gap-2 rounded-[20px] bg-pine-100 p-1">
-          <button
-            type="button"
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-              tab === "pending" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
-            }`}
-            onClick={() => setTab("pending")}
-          >
-            리뷰할 것
-          </button>
-          <button
-            type="button"
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-              tab === "reviewed_bad" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
-            }`}
-            onClick={() => setTab("reviewed_bad")}
-          >
-            BAD
-          </button>
-          <button
-            type="button"
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-              tab === "reviewed_good" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
-            }`}
-            onClick={() => setTab("reviewed_good")}
-          >
-            GOOD
-          </button>
-          <button
-            type="button"
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-              tab === "reviewed" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
-            }`}
-            onClick={() => setTab("reviewed")}
-          >
-            전체
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-slate-500">모바일 저장</p>
-            <p className="truncate text-sm text-slate-700">
-              {dirtyCount ? `저장되지 않은 변경 ${dirtyCount}건` : "저장되지 않은 변경 없음"}
+    <div className="fixed inset-x-0 bottom-0 z-20 px-4 pb-4 lg:hidden">
+      <div className="mx-auto max-w-[1600px] rounded-[24px] border border-slate-200 bg-white/95 shadow-panel backdrop-blur">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-500">모바일 작업 바</p>
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {dirtyCount ? `미저장 변경 ${dirtyCount}건` : "미저장 변경 없음"}
             </p>
           </div>
-          <button
-            className={buttonClassName("secondary")}
-            type="button"
-            onClick={onMarkAllGood}
-            disabled={loading || saving}
-          >
-            전부 GOOD
-          </button>
-          <button
-            className={buttonClassName("secondary")}
-            type="button"
-            onClick={onRefresh}
-            disabled={loading || saving}
-          >
-            새로고침
-          </button>
-          <button
-            className={buttonClassName("primary")}
-            type="button"
-            onClick={onSaveAll}
-            disabled={saving || dirtyCount === 0}
-          >
-            {dirtyCount ? `Save (${dirtyCount})` : "Save"}
-          </button>
-        </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              className={buttonClassName("primary")}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSaveAll();
+              }}
+              disabled={saving || dirtyCount === 0}
+            >
+              {dirtyCount ? `저장 ${dirtyCount}` : "저장"}
+            </button>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {expanded ? "접기" : "펼치기"}
+            </span>
+          </div>
+        </button>
+
+        {expanded ? (
+          <div className="grid gap-3 border-t border-slate-200 px-4 py-3">
+            <div className="grid grid-cols-4 gap-2 rounded-[20px] bg-pine-100 p-1">
+              <button
+                type="button"
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  tab === "pending" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
+                }`}
+                onClick={() => setTab("pending")}
+              >
+                미검수
+              </button>
+              <button
+                type="button"
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  tab === "reviewed_bad" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
+                }`}
+                onClick={() => setTab("reviewed_bad")}
+              >
+                BAD
+              </button>
+              <button
+                type="button"
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  tab === "reviewed_good" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
+                }`}
+                onClick={() => setTab("reviewed_good")}
+              >
+                GOOD
+              </button>
+              <button
+                type="button"
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  tab === "reviewed" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
+                }`}
+                onClick={() => setTab("reviewed")}
+              >
+                전체
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className={buttonClassName("secondary")}
+                type="button"
+                onClick={onMarkAllGood}
+                disabled={loading || saving}
+              >
+                모두 GOOD
+              </button>
+              <button
+                className={buttonClassName("secondary")}
+                type="button"
+                onClick={onRefresh}
+                disabled={loading || saving}
+              >
+                새로고침
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -103,6 +132,7 @@ function MobileQuickBar({
 export default function App({ config, hasValidConfig, supabase }) {
   const [activeMenu, setActiveMenu] = useState("scrapped-document-review");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileQuickBarExpanded, setMobileQuickBarExpanded] = useState(false);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authStatus, setAuthStatus] = useState({ message: "", isError: false });
@@ -206,12 +236,14 @@ export default function App({ config, hasValidConfig, supabase }) {
     setStatus({ message: "로그아웃되었습니다.", isError: false });
   }
 
+  const activeTabLabel = useMemo(() => TAB_LABELS[tab] || "검수", [tab]);
+
   if (!hasValidConfig) {
     return (
       <div className="mx-auto max-w-6xl p-6">
         <section className={panelClassName("p-6")}>
           <h2 className="text-xl font-bold text-slate-900">설정 필요</h2>
-          <p className="mt-2 text-sm text-slate-500">`public/app-config.js`에 Supabase 설정을 입력하세요.</p>
+          <p className="mt-2 text-sm text-slate-500">`public/app-config.js`에 Supabase 설정을 입력해 주세요.</p>
         </section>
       </div>
     );
@@ -219,10 +251,11 @@ export default function App({ config, hasValidConfig, supabase }) {
 
   const visibleStatus = session ? status : authStatus;
   const showMobileQuickBar = session && isAllowedUser && activeMenu === "scrapped-document-review";
+  const mobileBottomPadding = showMobileQuickBar ? (mobileQuickBarExpanded ? "pb-56" : "pb-28") : "pb-6";
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6">
-      <SavingOverlay visible={saving} />
+      <SavingOverlay visible={saving} dirtyCount={dirtyCount} />
       <Sidebar
         activeMenu={activeMenu}
         onSelect={setActiveMenu}
@@ -267,20 +300,20 @@ export default function App({ config, hasValidConfig, supabase }) {
             <p className="mt-2 text-sm text-slate-500">관리자 이메일과 일치하지 않습니다.</p>
           </section>
         ) : (
-          <section className={panelClassName("p-4 pb-40 sm:p-6 sm:pb-6")}>
+          <section className={panelClassName(`p-4 ${mobileBottomPadding} sm:p-6 sm:pb-6`)}>
             {activeMenu === "scrapped-document-review" ? (
               <>
                 <div className="mb-6 rounded-[24px] border border-pine-100 bg-pine-50/70 px-4 py-4 sm:px-5 sm:py-5">
-                  <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">스크랩 게시글 평가 검토</h2>
+                  <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">스크랩 게시글 수동 검수</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    이 작업은 LLM이 관련 게시글을 scoring한 결과를 고도화하기 위한 샘플 데이터 라벨링 검토 작업입니다.
+                    LLM이 분류한 게시글을 사람이 다시 확인해 학습용 레이블 데이터를 정제하는 작업입니다.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    리뷰할 것은 subject가 일반, 매매일지, 광견병, 헛소리, 계집인 문서만 표시됩니다.
+                    subject가 일반, 매매일지, 관망글, 뉴스정리, 계좌인 문서를 우선 검수 대상으로 보여줍니다.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="rounded-full bg-white px-3 py-1 font-medium text-pine-900 ring-1 ring-inset ring-pine-100">
-                      링크를 열어 확인한 뒤 GOOD/BAD와 사유를 입력하세요.
+                      문서를 열어 확인한 뒤 GOOD/BAD와 사유를 입력해 주세요.
                     </span>
                     <span
                       className={`rounded-full px-3 py-1 font-medium ring-1 ring-inset ${
@@ -289,7 +322,10 @@ export default function App({ config, hasValidConfig, supabase }) {
                           : "bg-slate-50 text-slate-500 ring-slate-200"
                       }`}
                     >
-                      {dirtyCount ? `저장되지 않은 변경 ${dirtyCount}건` : "저장되지 않은 변경 없음"}
+                      {dirtyCount ? `미저장 변경 ${dirtyCount}건` : "미저장 변경 없음"}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
+                      기본 기간: 최근 7일
                     </span>
                   </div>
                 </div>
@@ -299,6 +335,10 @@ export default function App({ config, hasValidConfig, supabase }) {
                   loading={loading}
                   saving={saving}
                   rowsLength={displayRows.length}
+                  activeTabLabel={activeTabLabel}
+                  totalCount={totalCount}
+                  page={page}
+                  totalPages={totalPages}
                   onMarkAllGood={handleMarkAllGood}
                   onSaveAll={saveAllRows}
                   onRefresh={refreshDocuments}
@@ -353,6 +393,8 @@ export default function App({ config, hasValidConfig, supabase }) {
           dirtyCount={dirtyCount}
           saving={saving}
           loading={loading}
+          expanded={mobileQuickBarExpanded}
+          onToggleExpanded={() => setMobileQuickBarExpanded((current) => !current)}
           onMarkAllGood={handleMarkAllGood}
           onRefresh={refreshDocuments}
           onSaveAll={saveAllRows}

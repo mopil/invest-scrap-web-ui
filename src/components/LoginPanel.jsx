@@ -14,7 +14,7 @@ export default function LoginPanel({ onSubmit, disabled, status }) {
   return (
     <section className={panelClassName("max-w-md p-6")}>
       <h2 className="text-xl font-bold text-slate-900">로그인</h2>
-      <p className="mt-2 text-sm text-slate-500">Supabase 관리자 계정으로 로그인하세요.</p>
+      <p className="mt-2 text-sm text-slate-500">Supabase 관리자 계정으로 로그인해 주세요.</p>
 
       {status?.isError && status?.message ? (
         <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">

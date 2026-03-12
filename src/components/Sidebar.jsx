@@ -1,8 +1,8 @@
 const MENU_ITEMS = [
   {
     id: "scrapped-document-review",
-    label: "스크랩 게시글 평가 검토",
-    description: "LLM 스코어링을 고도화하기 위한 샘플 데이터 라벨링 검토 작업입니다."
+    label: "스크랩 게시글 검수",
+    description: "LLM 스코어링 결과를 검수하고 학습용 데이터를 정제하는 작업 화면입니다."
   }
 ];
 
@@ -27,7 +27,7 @@ export default function Sidebar({ activeMenu, onSelect, isOpen, onClose }) {
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-pine-700">Invest Scrap</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">Web UI</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              스크랩 기능을 메뉴 단위로 확장해 나가는 범용 투자 스크랩 UI입니다.
+              스크랩 기능을 메뉴 단위로 확장하기 위한 내부 운영자용 관리 UI입니다.
             </p>
           </div>
           <button
@@ -55,6 +55,7 @@ export default function Sidebar({ activeMenu, onSelect, isOpen, onClose }) {
                     ? "border-pine-200 bg-pine-50 text-pine-900 shadow-sm"
                     : "border-transparent bg-slate-50 text-slate-600 hover:border-slate-200 hover:bg-white"
                 }`}
+                aria-pressed={isActive}
               >
                 <div className="text-sm font-semibold">{item.label}</div>
                 <div className={`mt-1 text-xs leading-5 ${isActive ? "text-pine-700" : "text-slate-500"}`}>

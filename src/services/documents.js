@@ -32,8 +32,6 @@ function applyTabFilter(query, tab) {
 
 function applyReviewedFilter(query, reviewedFilter) {
   switch (reviewedFilter) {
-    case "bad":
-      return query;
     case "bad_no_reason":
       return query.or("eval_reason.is.null,eval_reason.eq.");
     case "bad_with_reason":
@@ -53,40 +51,86 @@ function applySearchFilter(query, searchType, searchKeyword) {
   return query.ilike(column, `%${trimmed}%`);
 }
 
+function applySort(query, tab) {
+  if (tab === "reviewed" || tab === "reviewed_good" || tab === "reviewed_bad") {
+    return query.order("updated_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  }
+
+  return query.order("infer_score", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+}
+
+function buildBaseQuery({
+  supabase,
+  tab,
+  reviewedFilter,
+  dateFrom,
+  dateTo,
+  searchType,
+  searchKeyword,
+  head = false
+}) {
+  let query = supabase.from("scrapped_document").select(head ? "id" : "*", { count: "exact", head });
+  query = applyDateRange(query, dateFrom, dateTo);
+  query = applyTabFilter(query, tab);
+  query = applySearchFilter(query, searchType, searchKeyword);
+
+  if (tab === "reviewed_bad") {
+    query = applyReviewedFilter(query, reviewedFilter);
+  }
+
+  if (!head) {
+    query = applySort(query, tab);
+  }
+
+  return query;
+}
+
 export function createViewKey({ tab, dateFrom, dateTo, page, reviewedFilter, searchType, searchKeyword }) {
   return `${tab}::${dateFrom}::${dateTo}::${page}::${reviewedFilter}::${searchType}::${searchKeyword.trim()}`;
 }
 
-export async function fetchDocumentCounts({
-  supabase,
-  dateFrom,
-  dateTo,
-  searchType,
-  searchKeyword
-}) {
-  const hasSearchKeyword = Boolean(searchKeyword.trim());
-  const baseQuery = hasSearchKeyword
-    ? (tabName) =>
-        applySearchFilter(
-          applyTabFilter(supabase.from("scrapped_document").select("id", { count: "exact", head: true }), tabName),
-          searchType,
-          searchKeyword
-        )
-    : (tabName) =>
-        applyTabFilter(
-          applyDateRange(
-            supabase.from("scrapped_document").select("id", { count: "exact", head: true }),
-            dateFrom,
-            dateTo
-          ),
-          tabName
-        );
-
+export async function fetchDocumentCounts({ supabase, dateFrom, dateTo, searchType, searchKeyword }) {
   const [pendingResult, reviewedResult, reviewedGoodResult, reviewedBadResult] = await Promise.all([
-    baseQuery("pending"),
-    baseQuery("reviewed"),
-    baseQuery("reviewed_good"),
-    baseQuery("reviewed_bad")
+    buildBaseQuery({
+      supabase,
+      tab: "pending",
+      reviewedFilter: "bad",
+      dateFrom,
+      dateTo,
+      searchType,
+      searchKeyword,
+      head: true
+    }),
+    buildBaseQuery({
+      supabase,
+      tab: "reviewed",
+      reviewedFilter: "bad",
+      dateFrom,
+      dateTo,
+      searchType,
+      searchKeyword,
+      head: true
+    }),
+    buildBaseQuery({
+      supabase,
+      tab: "reviewed_good",
+      reviewedFilter: "bad",
+      dateFrom,
+      dateTo,
+      searchType,
+      searchKeyword,
+      head: true
+    }),
+    buildBaseQuery({
+      supabase,
+      tab: "reviewed_bad",
+      reviewedFilter: "bad",
+      dateFrom,
+      dateTo,
+      searchType,
+      searchKeyword,
+      head: true
+    })
   ]);
 
   return {
@@ -107,38 +151,20 @@ export async function fetchDocuments({
   searchType,
   searchKeyword
 }) {
-  const hasSearchKeyword = Boolean(searchKeyword.trim());
   const rangeFrom = (page - 1) * PAGE_SIZE;
   const rangeTo = rangeFrom + PAGE_SIZE - 1;
 
-  let query = hasSearchKeyword
-    ? applySearchFilter(
-        supabase
-          .from("scrapped_document")
-          .select("*", { count: "exact" })
-          .order("infer_score", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false }),
-        searchType,
-        searchKeyword
-      )
-    : applyTabFilter(
-        applyDateRange(
-          supabase
-            .from("scrapped_document")
-            .select("*", { count: "exact" })
-            .order("infer_score", { ascending: false, nullsFirst: false })
-            .order("created_at", { ascending: false }),
-          dateFrom,
-          dateTo
-        ),
-        tab
-      );
+  const query = buildBaseQuery({
+    supabase,
+    tab,
+    reviewedFilter,
+    dateFrom,
+    dateTo,
+    searchType,
+    searchKeyword
+  }).range(rangeFrom, rangeTo);
 
-  if (!hasSearchKeyword && tab === "reviewed_bad") {
-    query = applyReviewedFilter(query, reviewedFilter);
-  }
-
-  const { data, error, count } = await query.range(rangeFrom, rangeTo);
+  const { data, error, count } = await query;
   if (error) {
     throw error;
   }
@@ -152,11 +178,13 @@ export async function fetchDocuments({
 export async function saveDocumentReviews({ supabase, drafts }) {
   const draftEntries = Object.entries(drafts);
   const failed = [];
+  const updatedAt = new Date().toISOString();
 
   for (const [id, payload] of draftEntries) {
     const cleanedPayload = {
       good_bad_type: payload.good_bad_type ?? null,
-      eval_reason: payload.eval_reason && payload.eval_reason.trim() ? payload.eval_reason.trim() : null
+      eval_reason: payload.eval_reason && payload.eval_reason.trim() ? payload.eval_reason.trim() : null,
+      updated_at: updatedAt
     };
     const { error } = await supabase.from("scrapped_document").update(cleanedPayload).eq("id", id);
     if (error) {
@@ -166,7 +194,8 @@ export async function saveDocumentReviews({ supabase, drafts }) {
 
   return {
     failed,
-    savedEntries: draftEntries
+    savedEntries: draftEntries,
+    updatedAt
   };
 }
 

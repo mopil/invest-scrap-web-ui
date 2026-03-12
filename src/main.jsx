@@ -11,7 +11,7 @@ function renderFatalError(message) {
 
   root.innerHTML = `
     <div style="padding:24px;font-family:'Noto Sans KR',sans-serif">
-      <h2>런타임 에러</h2>
+      <h2>예상치 못한 오류</h2>
       <pre style="white-space:pre-wrap">${String(message)}</pre>
     </div>
   `;
@@ -34,9 +34,7 @@ const hasValidConfig =
   config.supabaseUrl !== "https://YOUR_PROJECT.supabase.co" &&
   config.supabaseAnonKey !== "YOUR_SUPABASE_ANON_KEY";
 
-const supabase = hasValidConfig
-  ? createClient(config.supabaseUrl, config.supabaseAnonKey)
-  : null;
+const supabase = hasValidConfig ? createClient(config.supabaseUrl, config.supabaseAnonKey) : null;
 
 function Root() {
   try {
@@ -45,7 +43,7 @@ function Root() {
     console.error(error);
     return (
       <div style={{ padding: 24, fontFamily: '"Noto Sans KR", sans-serif' }}>
-        <h2>런타임 에러</h2>
+        <h2>예상치 못한 오류</h2>
         <pre style={{ whiteSpace: "pre-wrap" }}>{String(error?.stack || error?.message || error)}</pre>
       </div>
     );

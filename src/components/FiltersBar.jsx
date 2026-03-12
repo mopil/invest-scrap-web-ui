@@ -28,8 +28,9 @@ export default function FiltersBar({
               tab === "pending" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
             }`}
             onClick={() => setTab("pending")}
+            aria-pressed={tab === "pending"}
           >
-            리뷰할 것 ({pendingCount})
+            미검수 ({pendingCount})
           </button>
           <button
             type="button"
@@ -37,8 +38,9 @@ export default function FiltersBar({
               tab === "reviewed_good" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
             }`}
             onClick={() => setTab("reviewed_good")}
+            aria-pressed={tab === "reviewed_good"}
           >
-            GOOD으로 평가함 ({reviewedGoodCount})
+            GOOD 완료 ({reviewedGoodCount})
           </button>
           <button
             type="button"
@@ -46,8 +48,9 @@ export default function FiltersBar({
               tab === "reviewed_bad" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
             }`}
             onClick={() => setTab("reviewed_bad")}
+            aria-pressed={tab === "reviewed_bad"}
           >
-            BAD로 평가함 ({reviewedBadCount})
+            BAD 완료 ({reviewedBadCount})
           </button>
           <button
             type="button"
@@ -55,8 +58,9 @@ export default function FiltersBar({
               tab === "reviewed" ? "bg-white text-pine-900 shadow" : "text-pine-900/80"
             }`}
             onClick={() => setTab("reviewed")}
+            aria-pressed={tab === "reviewed"}
           >
-            전체 ({reviewedCount})
+            전체 검수 완료 ({reviewedCount})
           </button>
         </div>
 
@@ -70,6 +74,7 @@ export default function FiltersBar({
                   reviewedFilter === option.value ? "bg-white text-rose-700 shadow" : "text-rose-700/80"
                 }`}
                 onClick={() => setReviewedFilter(option.value)}
+                aria-pressed={reviewedFilter === option.value}
               >
                 {option.label}
               </button>
@@ -88,16 +93,19 @@ export default function FiltersBar({
               onChange={(event) => setSearchType(event.target.value)}
             >
               <option value="title">제목</option>
-              <option value="author">author</option>
+              <option value="author">작성자</option>
             </select>
             <input
               className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-pine-500 focus:ring-2 focus:ring-pine-100"
               type="text"
               value={searchKeyword}
               onChange={(event) => setSearchKeyword(event.target.value)}
-              placeholder="키워드 입력"
+              placeholder="검색어를 입력하세요"
             />
           </div>
+          <span className="text-[11px] normal-case tracking-normal text-slate-400">
+            검색어가 있어도 현재 탭과 날짜 범위를 그대로 유지합니다.
+          </span>
         </label>
 
         <label className="grid gap-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">

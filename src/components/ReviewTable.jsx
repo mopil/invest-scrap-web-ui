@@ -2,6 +2,19 @@ import { BAD_REASON_CUSTOM, BAD_REASON_OPTIONS } from "../constants/review";
 import { buildDocumentUrl, formatDateTime } from "../utils/format";
 import { getScoreTone } from "../utils/ui";
 
+function normalizeReason(value) {
+  return String(value ?? "").trim();
+}
+
+function findMatchingBadReason(reason) {
+  const normalizedReason = normalizeReason(reason);
+  if (!normalizedReason) {
+    return "";
+  }
+
+  return BAD_REASON_OPTIONS.find((option) => normalizeReason(option) === normalizedReason) || "";
+}
+
 function getBadReasonSelectValue(reason, badReasonMode) {
   if (badReasonMode) {
     return badReasonMode;
@@ -11,8 +24,9 @@ function getBadReasonSelectValue(reason, badReasonMode) {
     return "";
   }
 
-  if (BAD_REASON_OPTIONS.includes(reason)) {
-    return reason;
+  const matchedReason = findMatchingBadReason(reason);
+  if (matchedReason) {
+    return matchedReason;
   }
 
   return BAD_REASON_CUSTOM;
@@ -27,7 +41,14 @@ function MetaChip({ label, value }) {
   );
 }
 
-function ReasonField({ row, currentType, currentReason, badReasonMode, onBadReasonModeChange, onReasonChange }) {
+function ReasonField({
+  row,
+  currentType,
+  currentReason,
+  badReasonMode,
+  onBadReasonModeChange,
+  onReasonChange
+}) {
   const badReasonValue = getBadReasonSelectValue(currentReason, badReasonMode);
   const showCustomBadReason = currentType === "BAD" && badReasonValue === BAD_REASON_CUSTOM;
 
@@ -41,12 +62,12 @@ function ReasonField({ row, currentType, currentReason, badReasonMode, onBadReas
           onChange={(event) => {
             const nextValue = event.target.value;
             onBadReasonModeChange(row, nextValue);
-            if (BAD_REASON_OPTIONS.includes(nextValue)) {
+            if (findMatchingBadReason(nextValue)) {
               onReasonChange(row, nextValue);
               return;
             }
             if (nextValue === BAD_REASON_CUSTOM) {
-              onReasonChange(row, BAD_REASON_OPTIONS.includes(currentReason) ? "" : currentReason ?? "");
+              onReasonChange(row, findMatchingBadReason(currentReason) ? "" : currentReason ?? "");
               return;
             }
             onReasonChange(row, "");
@@ -58,13 +79,13 @@ function ReasonField({ row, currentType, currentReason, badReasonMode, onBadReas
               {option}
             </option>
           ))}
-          <option value={BAD_REASON_CUSTOM}>직접입력</option>
+          <option value={BAD_REASON_CUSTOM}>직접 입력</option>
         </select>
         {showCustomBadReason ? (
           <textarea
             className="min-h-[104px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none transition focus:border-pine-500 focus:bg-white focus:ring-2 focus:ring-pine-100"
             value={currentReason ?? ""}
-            placeholder="직접 사유를 입력하세요"
+            placeholder="직접 사유를 입력해 주세요"
             onClick={(event) => event.stopPropagation()}
             onChange={(event) => onReasonChange(row, event.target.value)}
           />
@@ -77,7 +98,7 @@ function ReasonField({ row, currentType, currentReason, badReasonMode, onBadReas
     <textarea
       className="min-h-[104px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none transition focus:border-pine-500 focus:bg-white focus:ring-2 focus:ring-pine-100"
       value={currentReason ?? ""}
-      placeholder="사유를 입력하세요"
+      placeholder="사유를 입력해 주세요"
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => onReasonChange(row, event.target.value)}
     />
@@ -137,27 +158,59 @@ function getRowTone(row, draft, isSelected) {
   };
 }
 
-function DesktopRow({ row, draft, badReasonMode, isSelected, onSelect, onTypeChange, onBadReasonModeChange, onReasonChange }) {
+function DesktopRow({
+  row,
+  draft,
+  badReasonMode,
+  isSelected,
+  onSelect,
+  onTypeChange,
+  onBadReasonModeChange,
+  onReasonChange
+}) {
   const currentReason = draft?.eval_reason ?? row.eval_reason ?? "";
   const { currentType, wrapperClass } = getRowTone(row, draft, isSelected);
   const scoreTone = getScoreTone(row.infer_score);
 
   return (
-    <tr className={`${wrapperClass} border-b border-slate-200 last:border-b-0 transition`} data-row-id={row.id} onClick={() => onSelect(row.id)}>
-      <td className="relative min-w-[420px] px-4 py-4 align-top">
+    <tr
+      className={`${wrapperClass} border-b border-slate-200 last:border-b-0 transition`}
+      data-row-id={row.id}
+      onClick={() => onSelect(row.id)}
+    >
+      <td className="relative min-w-[380px] px-4 py-4 align-top">
         {isSelected ? <div className="absolute inset-y-3 left-1 w-1 rounded-full bg-yellow-400" /> : null}
         <div className={isSelected ? "pl-3" : ""}>
-          <a className="inline-block text-base font-bold leading-6 text-pine-900 transition hover:text-pine-700 hover:underline" href={buildDocumentUrl(row.board_id, row.document_id)} target="_blank" rel="noreferrer" onClick={() => onSelect(row.id)}>
-            {row.title || row.subject || "제목 없음"}
-          </a>
-          {row.subject ? <div className="mt-2 text-sm leading-6 text-slate-500">{row.subject}</div> : null}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <a
+                className="inline-block text-base font-bold leading-6 text-pine-900 transition hover:text-pine-700 hover:underline"
+                href={buildDocumentUrl(row.board_id, row.document_id)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => onSelect(row.id)}
+              >
+                {row.title || row.subject || "제목 없음"}
+              </a>
+              {row.subject ? <div className="mt-2 text-sm leading-6 text-slate-500">{row.subject}</div> : null}
+            </div>
+            <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${scoreTone}`}>
+              {row.infer_score ?? "-"}
+            </span>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <MetaChip label="ID" value={row.id} />
-            <MetaChip label="DOC" value={row.document_id} />
-            <MetaChip label="BOARD" value={row.board_id} />
             <MetaChip label="AUTHOR" value={row.author} />
             <MetaChip label="COMMENTS" value={row.comment_count} />
             <MetaChip label="VIEWS" value={row.view_count} />
+            <MetaChip label="BOARD" value={row.board_id} />
+            <MetaChip label="DOC" value={row.document_id} />
+          </div>
+          <div className="mt-3 text-sm text-slate-500">
+            <span className="mr-2 font-semibold text-pine-900">Created</span>
+            {formatDateTime(row.created_at)}
+            <span className="mx-2 text-slate-300">|</span>
+            <span className="mr-2 font-semibold text-pine-900">Scrapped</span>
+            {formatDateTime(row.scrapped_at)}
           </div>
         </div>
       </td>
@@ -165,41 +218,59 @@ function DesktopRow({ row, draft, badReasonMode, isSelected, onSelect, onTypeCha
         <TypeButtons row={row} currentType={currentType} onTypeChange={onTypeChange} />
       </td>
       <td className="w-[360px] px-4 py-4 align-top">
-        <ReasonField row={row} currentType={currentType} currentReason={currentReason} badReasonMode={badReasonMode} onBadReasonModeChange={onBadReasonModeChange} onReasonChange={onReasonChange} />
-      </td>
-      <td className="whitespace-nowrap px-4 py-4 align-top">
-        <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${scoreTone}`}>{row.infer_score ?? "-"}</span>
-      </td>
-      <td className="min-w-[210px] px-4 py-4 align-top text-sm text-slate-500">
-        <div className="leading-6"><span className="mr-2 font-semibold text-pine-900">Created</span>{formatDateTime(row.created_at)}</div>
-        <div className="leading-6"><span className="mr-2 font-semibold text-pine-900">Scrapped</span>{formatDateTime(row.scrapped_at)}</div>
+        <ReasonField
+          row={row}
+          currentType={currentType}
+          currentReason={currentReason}
+          badReasonMode={badReasonMode}
+          onBadReasonModeChange={onBadReasonModeChange}
+          onReasonChange={onReasonChange}
+        />
       </td>
     </tr>
   );
 }
 
-function MobileCard({ row, draft, badReasonMode, isSelected, onSelect, onTypeChange, onBadReasonModeChange, onReasonChange }) {
+function MobileCard({
+  row,
+  draft,
+  badReasonMode,
+  isSelected,
+  onSelect,
+  onTypeChange,
+  onBadReasonModeChange,
+  onReasonChange
+}) {
   const currentReason = draft?.eval_reason ?? row.eval_reason ?? "";
   const { currentType, wrapperClass } = getRowTone(row, draft, isSelected);
   const scoreTone = getScoreTone(row.infer_score);
 
   return (
-    <article className={`${wrapperClass} relative rounded-[24px] border border-slate-200 p-4 shadow-sm transition`} data-row-id={row.id} onClick={() => onSelect(row.id)}>
+    <article
+      className={`${wrapperClass} relative rounded-[24px] border border-slate-200 p-4 shadow-sm transition`}
+      data-row-id={row.id}
+      onClick={() => onSelect(row.id)}
+    >
       {isSelected ? <div className="absolute inset-y-4 left-1 w-1 rounded-full bg-yellow-400" /> : null}
       <div className={isSelected ? "pl-3" : ""}>
         <div className="flex items-start justify-between gap-3">
-          <a className="text-base font-bold leading-6 text-pine-900 hover:underline" href={buildDocumentUrl(row.board_id, row.document_id)} target="_blank" rel="noreferrer" onClick={() => onSelect(row.id)}>
+          <a
+            className="text-base font-bold leading-6 text-pine-900 hover:underline"
+            href={buildDocumentUrl(row.board_id, row.document_id)}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => onSelect(row.id)}
+          >
             {row.title || row.subject || "제목 없음"}
           </a>
-          <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${scoreTone}`}>{row.infer_score ?? "-"}</span>
+          <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${scoreTone}`}>
+            {row.infer_score ?? "-"}
+          </span>
         </div>
 
         {row.subject ? <div className="mt-2 text-sm leading-6 text-slate-500">{row.subject}</div> : null}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <MetaChip label="ID" value={row.id} />
-          <MetaChip label="DOC" value={row.document_id} />
-          <MetaChip label="BOARD" value={row.board_id} />
           <MetaChip label="AUTHOR" value={row.author} />
           <MetaChip label="COMMENTS" value={row.comment_count} />
           <MetaChip label="VIEWS" value={row.view_count} />
@@ -207,30 +278,62 @@ function MobileCard({ row, draft, badReasonMode, isSelected, onSelect, onTypeCha
 
         <div className="mt-4 grid gap-3">
           <TypeButtons row={row} currentType={currentType} onTypeChange={onTypeChange} />
-          <ReasonField row={row} currentType={currentType} currentReason={currentReason} badReasonMode={badReasonMode} onBadReasonModeChange={onBadReasonModeChange} onReasonChange={onReasonChange} />
+          <ReasonField
+            row={row}
+            currentType={currentType}
+            currentReason={currentReason}
+            badReasonMode={badReasonMode}
+            onBadReasonModeChange={onBadReasonModeChange}
+            onReasonChange={onReasonChange}
+          />
         </div>
 
         <div className="mt-4 text-sm text-slate-500">
-          <div className="leading-6"><span className="mr-2 font-semibold text-pine-900">Created</span>{formatDateTime(row.created_at)}</div>
-          <div className="leading-6"><span className="mr-2 font-semibold text-pine-900">Scrapped</span>{formatDateTime(row.scrapped_at)}</div>
+          <div className="leading-6">
+            <span className="mr-2 font-semibold text-pine-900">Created</span>
+            {formatDateTime(row.created_at)}
+          </div>
+          <div className="leading-6">
+            <span className="mr-2 font-semibold text-pine-900">Scrapped</span>
+            {formatDateTime(row.scrapped_at)}
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
-export default function ReviewTable({ loading, displayRows, drafts, badReasonModes, selectedRowId, rowKey, onSelect, onTypeChange, onBadReasonModeChange, onReasonChange }) {
+export default function ReviewTable({
+  loading,
+  displayRows,
+  drafts,
+  badReasonModes,
+  selectedRowId,
+  rowKey,
+  onSelect,
+  onTypeChange,
+  onBadReasonModeChange,
+  onReasonChange
+}) {
   if (loading) {
-    return <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500">데이터를 불러오는 중입니다...</div>;
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500">
+        데이터를 불러오는 중입니다...
+      </div>
+    );
   }
 
   if (!displayRows.length) {
-    return <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500">조건에 맞는 데이터가 없습니다.</div>;
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500">
+        조건에 맞는 데이터가 없습니다.
+      </div>
+    );
   }
 
   return (
     <>
-      <div className="grid gap-4 lg:hidden">
+      <div className="grid gap-3 lg:hidden">
         {displayRows.map((row) => (
           <MobileCard
             key={row.id}
@@ -250,11 +353,9 @@ export default function ReviewTable({ loading, displayRows, drafts, badReasonMod
         <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-left text-sm text-slate-600">
-              <th className="bg-pine-50 px-4 py-3 font-semibold">INFO</th>
-              <th className="bg-pine-50 px-4 py-3 font-semibold">GOOD / BAD</th>
-              <th className="bg-pine-50 px-4 py-3 font-semibold">REASON</th>
-              <th className="bg-pine-50 px-4 py-3 font-semibold">Infer Score</th>
-              <th className="bg-pine-50 px-4 py-3 font-semibold">Timeline</th>
+              <th className="bg-pine-50 px-4 py-3 font-semibold">문서 정보</th>
+              <th className="bg-pine-50 px-4 py-3 font-semibold">판정</th>
+              <th className="bg-pine-50 px-4 py-3 font-semibold">사유</th>
             </tr>
           </thead>
           <tbody>

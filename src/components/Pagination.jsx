@@ -9,8 +9,17 @@ export default function Pagination({ page, totalPages, totalCount, onPrev, onNex
         <span className="font-semibold text-slate-900">{page}</span> / {totalPages || 1} 페이지
       </div>
       <div className="flex gap-2">
-        <button className={buttonClassName("secondary")} type="button" onClick={onPrev} disabled={page <= 1}>이전</button>
-        <button className={buttonClassName("secondary")} type="button" onClick={onNext} disabled={page >= totalPages}>다음</button>
+        <button className={buttonClassName("secondary")} type="button" onClick={onPrev} disabled={page <= 1}>
+          이전
+        </button>
+        <button
+          className={buttonClassName("secondary")}
+          type="button"
+          onClick={onNext}
+          disabled={page >= totalPages}
+        >
+          다음
+        </button>
       </div>
     </div>
   );
