@@ -19,6 +19,10 @@ function applyTabFilter(query, tab) {
     return query.is("good_bad_type", null).in("subject", PENDING_SUBJECTS);
   }
 
+  if (tab === "reviewed_good") {
+    return query.eq("good_bad_type", "GOOD");
+  }
+
   if (tab === "reviewed_bad") {
     return query.eq("good_bad_type", "BAD");
   }
@@ -78,15 +82,17 @@ export async function fetchDocumentCounts({
           tabName
         );
 
-  const [pendingResult, reviewedResult, reviewedBadResult] = await Promise.all([
+  const [pendingResult, reviewedResult, reviewedGoodResult, reviewedBadResult] = await Promise.all([
     baseQuery("pending"),
     baseQuery("reviewed"),
+    baseQuery("reviewed_good"),
     baseQuery("reviewed_bad")
   ]);
 
   return {
     pending: pendingResult.count || 0,
     reviewed: reviewedResult.count || 0,
+    reviewedGood: reviewedGoodResult.count || 0,
     reviewedBad: reviewedBadResult.count || 0
   };
 }

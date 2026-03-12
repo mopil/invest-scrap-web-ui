@@ -39,7 +39,7 @@ export function useReviewDocuments({ supabase, session, config }) {
   const [badReasonModes, setBadReasonModes] = useState({});
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [tabCounts, setTabCounts] = useState({ pending: 0, reviewed: 0, reviewedBad: 0 });
+  const [tabCounts, setTabCounts] = useState({ pending: 0, reviewed: 0, reviewedGood: 0, reviewedBad: 0 });
   const [selectedRowId, setSelectedRowId] = useState(() => {
     try {
       return window.localStorage.getItem(SELECTED_ROW_STORAGE_KEY) || "";
