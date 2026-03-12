@@ -18,7 +18,7 @@
 - Edge Function
   - 현재 `BAD` 문서 조회
   - 아직 임베딩되지 않은 row만 선별
-  - 임베딩 생성
+  - `title` 기준 임베딩 생성
   - `bad_document_embedding` 테이블에 upsert
 
 ## 로컬 파일 수정 위치
@@ -136,3 +136,4 @@ npx supabase secrets set SUPABASE_ANON_KEY=YOUR_ANON_KEY
   - `supabase/functions/<function-name>/index.ts`
 - 함수 이름과 배포 이름은 반드시 동일해야 한다.
 - 전체 BAD 기준 로직, 중복 방지 로직, 관리자 검증 로직은 프론트가 아니라 Edge Function 안에 둔다.
+- 임베딩은 현재 `title`만 사용한다. `eval_reason`이나 별도 원문은 테이블에 저장하지 않는다.

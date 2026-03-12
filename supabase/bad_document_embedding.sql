@@ -3,7 +3,6 @@ create extension if not exists vector;
 create table if not exists public.bad_document_embedding (
   scrapped_document_id bigint primary key
     references public.scrapped_document(id) on delete cascade,
-  embedding_input text not null,
   embedding_vector vector(1536) not null,
   updated_at timestamptz not null default now()
 );

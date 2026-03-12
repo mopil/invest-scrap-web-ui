@@ -21,7 +21,7 @@ function jsonResponse(body, status = 200) {
 }
 
 function buildEmbeddingInput(document) {
-  return [document.title, document.eval_reason].map((value) => String(value ?? "").trim()).filter(Boolean).join("\n\n");
+  return String(document.title ?? "").trim();
 }
 
 async function requireAdminUser(req, supabaseUrl, supabaseAnonKey, adminEmail) {
@@ -83,7 +83,7 @@ async function fetchUnembeddedBadDocuments(supabase) {
   while (true) {
     const { data, error } = await supabase
       .from("scrapped_document")
-      .select("id, title, subject, eval_reason")
+      .select("id, title")
       .eq("good_bad_type", "BAD")
       .order("id", { ascending: true })
       .range(from, from + fetchBatchSize - 1);
@@ -114,16 +114,15 @@ async function fetchUnembeddedBadDocuments(supabase) {
         continue;
       }
 
-      const hasReason = String(row.eval_reason ?? "").trim();
-      if (!hasReason) {
+      const title = String(row.title ?? "").trim();
+      if (!title) {
         skippedCount += 1;
         continue;
       }
 
       documents.push({
         scrapped_document_id: Number(row.id),
-        title: row.title || row.subject || "",
-        eval_reason: hasReason
+        title
       });
     }
 
@@ -195,7 +194,6 @@ Deno.serve(async (req) => {
         const updatedAt = new Date().toISOString();
         const rows = normalizedChunk.map((document, chunkIndex) => ({
           scrapped_document_id: document.scrapped_document_id,
-          embedding_input: document.embedding_input,
           embedding_vector: embeddingVectors[chunkIndex],
           updated_at: updatedAt
         }));

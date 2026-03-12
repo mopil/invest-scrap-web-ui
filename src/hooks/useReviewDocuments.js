@@ -468,7 +468,7 @@ export function useReviewDocuments({ supabase, session, config, enabled = true }
       }
 
       setStatus({
-        message: `BAD 문서 ${successCount}건을 임베딩했습니다.${skipped ? ` ${skipped}건은 사유 없음으로 제외했습니다.` : ""}`,
+        message: `BAD 문서 ${successCount}건을 임베딩했습니다.${skipped ? ` ${skipped}건은 제목 없음으로 제외했습니다.` : ""}`,
         isError: false
       });
     } catch (error) {
